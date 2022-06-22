@@ -1,42 +1,50 @@
 #include <stdio.h>
 #include <Windows.h>
 
+#define SECTOR_SIZE 512
+
 int main() {
 	HANDLE hMbr = INVALID_HANDLE_VALUE;
 	HANDLE hBootloader = INVALID_HANDLE_VALUE;
-	PCHAR fileName = "bootloader.bin";
+	PWCHAR fileName = L"bootloader.bin";
+	PWCHAR MBRpath = L"\\\\.\\PhysicalDrive0";
 
-	hMbr = CreateFileA("\\\\.\\PhysicalDrive0", GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+	hMbr = CreateFileW(MBRpath, GENERIC_ALL, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
 
 	if (hMbr == INVALID_HANDLE_VALUE) {
 		printf("Failed to get MBR handle. %d\n", GetLastError());
 		return 1;
 	}
 
-	hBootloader = CreateFileA(fileName, GENERIC_ALL, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+	hBootloader = CreateFileW(fileName, GENERIC_ALL, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
 
 	if (hBootloader == INVALID_HANDLE_VALUE) {
-		printf("Failed to get MBR handle. %d\n", GetLastError());
+		printf("Failed to get file handle. %d\n", GetLastError());
 		return 1;
 	}
 
 	DWORD fileSize = GetFileSize(hBootloader, NULL);
-	if (fileSize != 512) {
-		printf("bootloader size not 512.\n");
-		return 1;
-	}
 
-	PCHAR buffer = (PCHAR)calloc(BUFSIZ, sizeof(CHAR));
-	if (buffer) {
+	PCHAR MBR = (PCHAR)calloc(SECTOR_SIZE, sizeof(CHAR));
+	PCHAR newMBR = (PCHAR)calloc(SECTOR_SIZE, sizeof(CHAR));
+
+	if (MBR && newMBR) {
 		DWORD dwByteRead = 0;
-		if (ReadFile(hBootloader, buffer, 512, &dwByteRead, NULL)) {
-			if (!WriteFile(hMbr, buffer, dwByteRead, &dwByteRead, NULL)) {
-				printf("Failed to write to mbr. %d\n", GetLastError());
-				return 1;
-			}
+		DWORD dwByteWrite = 0;
+		if (!ReadFile(hMbr, MBR, SECTOR_SIZE, &dwByteRead, NULL)) {
+			printf("Failed to read mbr. %d\n", GetLastError());
+			return 1;
 		}
-		else {
-			printf("Failed to read file. %d\n", GetLastError());
+		if (!ReadFile(hBootloader, newMBR, fileSize, &dwByteRead, NULL)) {
+			printf("Failed to read mbr. %d\n", GetLastError());
+			return 1;
+		}
+
+		memcpy(newMBR + 440, MBR + 440, SECTOR_SIZE - 440);
+
+		SetFilePointer(hMbr, 0, NULL, FILE_BEGIN);
+		if (!WriteFile(hMbr, newMBR, SECTOR_SIZE, &dwByteWrite, NULL)) {
+			printf("Failed to write to mbr. %d\n", GetLastError());
 			return 1;
 		}
 	}
