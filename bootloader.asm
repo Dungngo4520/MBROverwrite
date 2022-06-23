@@ -1,37 +1,34 @@
-BITS    16
-ORG     0x7c00
+[ORG 7c00h]   ; code starts at 7c00h
+xor ax, ax    ; make sure ds is set to 0
+mov ds, ax
+cld
 
-jmp start
+; start putting in values:
+mov ah, 2h    ; int13h function 2
+mov al, 1    ; we want to read 63 sectors
+mov ch, 0     ; from cylinder number 0
+mov cl, 2     ; the sector number 2 - second sector (starts from 1, not 0)
+mov dh, 0     ; head number 0
+xor bx, bx
+mov es, bx    ; es should be 0
+mov bx, 7e00h ; 512bytes from origin address 7c00h
+int 13h
+jmp 7e00h     ; jump to the next sector
 
-start:
-        mov ax,cs
-        mov ds,ax
-        mov si,msg
+; to fill this sector and make it bootable:
+times 510-($-$$) db 0
+dw 0AA55h
 
-        call print
+; start putting in values:
+mov ah, 2h		; int13h function 2
+mov al, 1		; we want to read 63 sectors
+mov ch, 0		; from cylinder number 0
+mov cl, 3     ; the sector number 2 - second sector (starts from 1, not 0)
+mov dh, 0     ; head number 0
+xor bx, bx
+mov es, bx    ; es should be 0
+mov bx, 7c00h ; 512bytes from origin address 7c00h
+int 13h
+jmp 7c00h     ; jump to the next sector
 
-print:
-        push ax
-        cld
-next:
-        mov al,[si]
-        cmp al,0
-        je waitEnter
-        call printchar
-        inc si
-        jmp next
-
-printchar:
-        mov ah,0x0e
-        int 0x10
-        ret
-
-waitEnter:
-    mov ah, 00h
-    int 16h
-
-    cmp al, 0dh ;Enter code
-    je start
-    jne waitEnter
-
-msg: db "Press ENTER to continue", 13, 10, 0
+times 1024-($-$$) db 0
