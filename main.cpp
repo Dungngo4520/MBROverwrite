@@ -33,9 +33,10 @@ int main() {
 
 	DWORD fileSize = GetFileSize(hBootloader, NULL);
 	printf("FileSize : %d\n", fileSize);
+	DWORD fileSizeAlign = (fileSize + SECTOR_SIZE - 1) / SECTOR_SIZE * SECTOR_SIZE;
 
 	PCHAR oldMBR = (PCHAR)calloc(SECTOR_SIZE, sizeof(CHAR));
-	PCHAR newMBR = (PCHAR)calloc(fileSize, sizeof(CHAR));
+	PCHAR newMBR = (PCHAR)calloc(fileSizeAlign, sizeof(CHAR));
 
 	if (oldMBR && newMBR) {
 		DWORD dwByteRead = 0;
@@ -62,15 +63,17 @@ int main() {
 		}
 
 		// write old MBR to third sector
-		SetFilePointer(hOldMBR, SECTOR_SIZE * 2, NULL, FILE_BEGIN);
+		SetFilePointer(hOldMBR, SECTOR_SIZE*2, NULL, FILE_BEGIN);
 		if (!WriteFile(hOldMBR, oldMBR, SECTOR_SIZE, &dwByteWrite, NULL)) {
 			printf("Failed to write to mbr. %d\n", GetLastError());
 			return 1;
 		}
 
+		memcpy(newMBR + 440, oldMBR + 440, SECTOR_SIZE - 440);
+
 		// write new MBR to the first sector
 		SetFilePointer(hOldMBR, 0, NULL, FILE_BEGIN);
-		if (!WriteFile(hOldMBR, newMBR, fileSize, &dwByteWrite, NULL)) {
+		if (!WriteFile(hOldMBR, newMBR, fileSizeAlign, &dwByteWrite, NULL)) {
 			printf("Failed to write to mbr. %d\n", GetLastError());
 			return 1;
 		}
